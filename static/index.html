@@ -259,10 +259,13 @@
         <button class="suggestion-btn" onclick="fillInput(this)">📊 Build dashboard volume IBFT theo ngày</button>
         <button class="suggestion-btn" onclick="fillInput(this)">🔍 Điều tra giao dịch IBFT bị lỗi & xem raw payload</button>
         <button class="suggestion-btn" onclick="fillInput(this)">📈 Cashback redemption rate KPI for monthly report</button>
-        <button class="suggestion-btn" onclick="fillInput(this)">👤 Xem full event đăng nhập user để phân tích hành vi</button>
-        <button class="suggestion-btn" onclick="fillInput(this)">❓ Tôi muốn lấy data top-up — nên dùng bảng nào?</button>
         <button class="suggestion-btn" onclick="fillInput(this)">📉 QR payment success rate for BI dashboard</button>
-        <button class="suggestion-btn" onclick="fillInput(this)">🔎 Tôi cần tìm bảng appsflyer để phân tích attribution</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">👤 Xem full event profile thay đổi của user — compliance audit</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">🔔 Tỉ lệ gửi push notification thành công theo channel</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">💬 Debug tại sao OTP SMS của user không nhận được</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">🎧 Tôi cần CSAT score và average handle time của CS team</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">🏪 Debug lỗi cashier app — merchant không scan được QR</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">🏦 Tìm bảng thông tin ngân hàng để join với report IBFT</button>
       </div>
     </div>
   </div>
@@ -367,7 +370,21 @@
     }
 
     function renderMarkdown(text) {
-      return text
+      // 1. Sanitize LaTeX/MathJax arrows that the LLM sometimes emits — convert to Unicode →.
+      //    Frontend has no math renderer, so $\rightarrow$ would print as raw text.
+      text = text
+        .replace(/\$\s*\\?rightarrow\s*\$/g, '→')
+        .replace(/\$\s*\\?to\s*\$/g, '→')
+        .replace(/\\rightarrow\b/g, '→')
+        .replace(/\\to\b/g, '→')
+        .replace(/(^|\s)-->\s/g, '$1→ ')
+        .replace(/(^|\s)=>\s/g, '$1→ ');
+
+      // 2. Collapse blank lines between consecutive bullets so they stay in one <ul>.
+      text = text.replace(/^(\s*-\s.+)\n\s*\n(?=\s*-\s)/gm, '$1\n');
+
+      // 3. Standard markdown-lite rendering.
+      let html = text
         .replace(/^## (.+)$/gm, '<h2>$1</h2>')
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
@@ -380,12 +397,22 @@
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/^---$/gm, '<hr/>')
         .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-        .replace(/^\- (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>(\n|$))+/g, m => `<ul>${m}</ul>`)
+        .replace(/^\s*-\s+(.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*?<\/li>(\s*\n)?)+/gs, m => `<ul>${m.replace(/\s*\n\s*/g, '')}</ul>`);
+
+      // 4. Paragraph / line-break handling.
+      //    Block elements (h2/h3/hr/ul/blockquote) carry their own vertical margin,
+      //    so we strip <br/> and empty <p> wrappers that would stack on top of them.
+      html = html
         .replace(/\n{2,}/g, '</p><p>')
         .replace(/\n/g, '<br/>')
-        .replace(/^(?!<[hbulp])/, '<p>')
-        .replace(/$(?!<\/[hbulp])/, '</p>');
+        .replace(/(<br\/>\s*)+(?=<(?:h2|h3|hr|ul|blockquote))/g, '')
+        .replace(/(<\/(?:h2|h3|hr|ul|blockquote)>)(<br\/>\s*)+/g, '$1')
+        .replace(/<\/p>\s*<p>\s*(?=<(?:h2|h3|hr|ul|blockquote))/g, '')
+        .replace(/(<\/(?:h2|h3|hr|ul|blockquote)>)\s*<\/p>\s*<p>/g, '$1')
+        .replace(/<p>\s*<\/p>/g, '');
+
+      return '<p>' + html + '</p>';
     }
 
     function copyUrn(urn) {
